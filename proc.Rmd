@@ -108,7 +108,7 @@ exts <- out %>%
   do.call('rbind', .) %>% 
   remove_rownames() %>% 
   separate(img_bnd, c('img', 'bnd'), sep = '\\.')
-head(exts)
+exts
 ```
 
 Scatterplots of band values (din) with measured chlorophyll.
@@ -206,7 +206,7 @@ exts <- out %>%
   do.call('rbind', .) %>% 
   remove_rownames() %>% 
   separate(img_bnd, c('img', 'bnd'), sep = '\\.')
-head(exts)
+exts
 ```
 
 Scatterplots of band values (din) with measured chlorophyll.
