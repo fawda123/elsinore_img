@@ -1,0 +1,222 @@
+---
+title: "Lake Elsinore image processing"
+author: ""
+output: 
+  html_document:
+    code_folding: hide
+self_contained: yes
+---
+
+# {.tabset}
+
+```{r, echo = F, message = F, warning = F}
+library(knitr)
+opts_chunk$set(warning = FALSE, message = FALSE, fig.path = 'figs/', dev.args = list(bg = 'transparent'), eval = T)
+
+library(raster)
+library(sf)
+library(tidyverse)
+library(mapview)
+
+prj_geo <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+prj_pro <- '+proj=utm +zone=11 +south +datum=WGS84'
+
+```
+
+## August 21st
+
+Map of in situ samples with chlorophyll concentration. 
+
+```{r}
+# get coverage of in situ points by date
+insit <- read_csv('raw/CHL_2017_08_21.csv', col_names = F) %>% 
+  rename(
+    site = X1, 
+    lat = X2, 
+    lon = X3, 
+    chl = X4
+  ) %>% 
+  mutate(lat = ifelse(site == 34, 33.66954, lat)) 
+coordinates(insit) <- ~ lon + lat
+proj4string(insit) <- "+proj=longlat +datum=WGS84"
+mapview(insit, zcol = 'chl', legend = T) 
+```
+
+Overlap of in situ samples (red numbers) with the spatial extent of each image. Note that the spatial extent is rectangular and not all pixels in the extent have values.
+```{r fig.height = 7, fig.width = 5}
+# transform insit to projected
+insit <- spTransform(insit, CRS("+proj=utm +zone=11s +datum=WGS84")) 
+
+# raster tiffs
+imgs_pth <- list.files('img/GeoTiff_08_21/', full.names = T)
+
+# get raster extents
+out <- list()
+cmbs <- for(i in 1:length(imgs_pth)){
+  
+  # get extent
+  rst_chk <- stack(imgs_pth[[i]]) %>% 
+    extent 
+
+  # out <- c(out, list(tmp))
+  out[[i]] <- rst_chk
+
+  }
+
+# get max/min of all extents
+bnds <- c(out, list(extent(insit))) %>%
+  map(as.matrix) %>% 
+  do.call('rbind', .) %>% 
+  data.frame(val = row.names(.), .) %>% 
+  group_by(val) %>% 
+  summarise(
+    minv = min(min), 
+    maxv = max(max)
+    ) %>% 
+  gather('ind1', 'ind2', -val) %>% 
+  spread(val, ind2) %>% 
+  dplyr::select(-ind1)
+  
+plot(y ~ x, bnds, type = 'n')  
+invisible(lapply(out, plot, add = T))
+txt <- data.frame(insit)
+text(txt$lon, txt$lat, txt$site, cex = 0.5, col = 'red')
+```
+
+Extracted pixel values for each of four bands in each image where sample sites occurred within an image.
+```{r, cache = T}
+# extract values from raster
+out <- list()
+for(i in 1:length(imgs_pth)){
+  
+  # cat(i, 'of', length(imgs_pth), '\n')
+  
+  rst <- stack(imgs_pth[[i]])
+  crs(rst) <- "+proj=utm +zone=11s +datum=WGS84"
+  rst_chk  <- rst %>% 
+    raster::extract(insit) %>% 
+    data.frame(insit@data, .) %>%
+    gather('img_bnd', 'din', -site, -chl) %>% 
+    na.omit
+
+  # out <- c(out, list(tmp))
+  out[[i]] <- rst_chk
+
+}
+
+exts <- out %>% 
+  do.call('rbind', .) %>% 
+  remove_rownames() %>% 
+  separate(img_bnd, c('img', 'bnd'), sep = '\\.')
+head(exts)
+```
+
+Scatterplots of band values (din) with measured chlorophyll.
+```{r fig.height = 4, fig.width  = 6}
+toplo <- exts
+ggplot(toplo, aes(x = din, y = chl)) + 
+  geom_point() + 
+  facet_wrap(~bnd, ncol = 2) + 
+  stat_smooth(method = 'lm') + 
+  theme_bw()
+```
+
+## September 6th
+
+Map of in situ samples with chlorophyll concentration. 
+
+```{r}
+# get coverage of in situ points by date
+insit <- read_csv('raw/CHL_2017_09_06.csv', col_names = F) %>% 
+  rename(
+    site = X1, 
+    lat = X2, 
+    lon = X3, 
+    chl = X4
+  ) %>% 
+  mutate(lon = ifelse(site == 39, -117.3597, lon))
+coordinates(insit) <- ~ lon + lat
+proj4string(insit) <- "+proj=longlat +datum=WGS84"
+mapview(insit, zcol = 'chl', legend = T) 
+```
+
+Overlap of in situ samples (red numbers) with the spatial extent of each image. Note that the spatial extent is rectangular and not all pixels in the extent have values.
+```{r fig.height = 7, fig.width = 7}
+# transform insit to projected
+insit <- spTransform(insit, CRS("+proj=utm +zone=11s +datum=WGS84")) 
+
+# raster tiffs
+imgs_pth <- list.files('img/GeoTiff_09_06/', full.names = T)
+
+# get raster extents
+out <- list()
+cmbs <- for(i in 1:length(imgs_pth)){
+  
+  # get extent
+  rst_chk <- stack(imgs_pth[[i]]) %>% 
+    extent 
+
+  # out <- c(out, list(tmp))
+  out[[i]] <- rst_chk
+
+  }
+
+# get max/min of all extents
+bnds <- c(out, list(extent(insit))) %>%
+  map(as.matrix) %>% 
+  do.call('rbind', .) %>% 
+  data.frame(val = row.names(.), .) %>% 
+  group_by(val) %>% 
+  summarise(
+    minv = min(min), 
+    maxv = max(max)
+    ) %>% 
+  gather('ind1', 'ind2', -val) %>% 
+  spread(val, ind2) %>% 
+  dplyr::select(-ind1)
+  
+plot(y ~ x, bnds, type = 'n')  
+invisible(lapply(out, plot, add = T))
+txt <- data.frame(insit)
+text(txt$lon, txt$lat, txt$site, cex = 0.5, col = 'red')
+```
+
+Extracted pixel values for each of four bands in each image where sample sites occurred within an image.
+```{r, cache = T}
+# extract values from raster
+out <- list()
+for(i in 1:length(imgs_pth)){
+  
+  # cat(i, 'of', length(imgs_pth), '\n')
+  
+  rst <- stack(imgs_pth[[i]])
+  crs(rst) <- "+proj=utm +zone=11s +datum=WGS84"
+  rst_chk  <- rst %>% 
+    raster::extract(insit) %>% 
+    data.frame(insit@data, .) %>%
+    gather('img_bnd', 'din', -site, -chl) %>% 
+    na.omit
+
+  # out <- c(out, list(tmp))
+  out[[i]] <- rst_chk
+
+}
+
+exts <- out %>% 
+  do.call('rbind', .) %>% 
+  remove_rownames() %>% 
+  separate(img_bnd, c('img', 'bnd'), sep = '\\.')
+head(exts)
+```
+
+Scatterplots of band values (din) with measured chlorophyll.
+```{r fig.height = 4, fig.width  = 6}
+toplo <- exts
+ggplot(toplo, aes(x = din, y = chl)) + 
+  geom_point() + 
+  facet_wrap(~bnd, ncol = 2) + 
+  stat_smooth(method = 'lm') + 
+  theme_bw()
+```
+
+
