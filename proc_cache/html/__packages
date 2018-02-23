@@ -15,3 +15,4 @@ forcats
 leaflet
 mapview
 bindrcpp
+proj4shortcut

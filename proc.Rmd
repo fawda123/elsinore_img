@@ -9,7 +9,7 @@ self_contained: yes
 
 # {.tabset}
 
-```{r, echo = F, message = F, warning = F}
+```{r, message = F, warning = F}
 library(knitr)
 opts_chunk$set(warning = FALSE, message = FALSE, fig.path = 'figs/', dev.args = list(bg = 'transparent'), eval = T)
 
@@ -17,9 +17,10 @@ library(raster)
 library(sf)
 library(tidyverse)
 library(mapview)
+library(proj4shortcut)
 
-prj_geo <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-prj_pro <- '+proj=utm +zone=11 +south +datum=WGS84'
+prj_geo <- geo_wgs84
+prj_pro <- utm_wgs84('11s')
 
 ```
 
@@ -38,14 +39,14 @@ insit <- read_csv('raw/CHL_2017_08_21.csv', col_names = F) %>%
   ) %>% 
   mutate(lat = ifelse(site == 34, 33.66954, lat)) 
 coordinates(insit) <- ~ lon + lat
-proj4string(insit) <- "+proj=longlat +datum=WGS84"
+proj4string(insit) <- prj_geo
 mapview(insit, zcol = 'chl', legend = T) 
 ```
 
 Overlap of in situ samples (red numbers) with the spatial extent of each image. Note that the spatial extent is rectangular and not all pixels in the extent have values.
 ```{r fig.height = 7, fig.width = 5}
 # transform insit to projected
-insit <- spTransform(insit, CRS("+proj=utm +zone=11s +datum=WGS84")) 
+insit <- spTransform(insit, CRS(prj_pro)) 
 
 # raster tiffs
 imgs_pth <- list.files('img/GeoTiff_08_21/', full.names = T)
@@ -92,7 +93,7 @@ for(i in 1:length(imgs_pth)){
   # cat(i, 'of', length(imgs_pth), '\n')
   
   rst <- stack(imgs_pth[[i]])
-  crs(rst) <- "+proj=utm +zone=11s +datum=WGS84"
+  crs(rst) <- prj_pro
   rst_chk  <- rst %>% 
     raster::extract(insit) %>% 
     data.frame(insit@data, .) %>%
@@ -136,14 +137,14 @@ insit <- read_csv('raw/CHL_2017_09_06.csv', col_names = F) %>%
   ) %>% 
   mutate(lon = ifelse(site == 39, -117.3597, lon))
 coordinates(insit) <- ~ lon + lat
-proj4string(insit) <- "+proj=longlat +datum=WGS84"
+proj4string(insit) <- prj_geo
 mapview(insit, zcol = 'chl', legend = T) 
 ```
 
 Overlap of in situ samples (red numbers) with the spatial extent of each image. Note that the spatial extent is rectangular and not all pixels in the extent have values.
 ```{r fig.height = 7, fig.width = 7}
 # transform insit to projected
-insit <- spTransform(insit, CRS("+proj=utm +zone=11s +datum=WGS84")) 
+insit <- spTransform(insit, CRS(prj_pro)) 
 
 # raster tiffs
 imgs_pth <- list.files('img/GeoTiff_09_06/', full.names = T)
@@ -190,7 +191,7 @@ for(i in 1:length(imgs_pth)){
   # cat(i, 'of', length(imgs_pth), '\n')
   
   rst <- stack(imgs_pth[[i]])
-  crs(rst) <- "+proj=utm +zone=11s +datum=WGS84"
+  crs(rst) <- prj_pro
   rst_chk  <- rst %>% 
     raster::extract(insit) %>% 
     data.frame(insit@data, .) %>%
