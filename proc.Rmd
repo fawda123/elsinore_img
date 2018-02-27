@@ -92,15 +92,31 @@ for(i in 1:length(imgs_pth)){
   
   # cat(i, 'of', length(imgs_pth), '\n')
   
+  # extract raster cells by points in insit
   rst <- stack(imgs_pth[[i]])
   crs(rst) <- prj_pro
   rst_chk  <- rst %>% 
-    raster::extract(insit) %>% 
-    data.frame(insit@data, .) %>%
-    gather('img_bnd', 'din', -site, -chl) %>% 
-    na.omit
+    raster::extract(insit, buffer = 0.5) %>% 
+    enframe %>% 
+    bind_cols(insit@data, .) %>% 
+    select(-name) %>% 
+    filter(map(.$value, is.matrix) %>% unlist) %>% 
+    mutate(value = map(value, function(x){
 
-  # out <- c(out, list(tmp))
+      sumpt <- x %>% 
+        as.data.frame %>% 
+        gather('img_bnd', 'din', everything()) %>% 
+        group_by(img_bnd) %>% 
+        summarise(
+          ncell = length(img_bnd),
+          din = mean(din)
+        )
+      return(sumpt)
+      
+    })) %>% 
+    unnest
+
+  # append to output
   out[[i]] <- rst_chk
 
 }
@@ -108,7 +124,8 @@ for(i in 1:length(imgs_pth)){
 exts <- out %>% 
   do.call('rbind', .) %>% 
   remove_rownames() %>% 
-  separate(img_bnd, c('img', 'bnd'), sep = '\\.')
+  separate(img_bnd, c('img', 'bnd'), sep = '\\.') %>% 
+  filter(!is.na(din)) # check this
 exts
 ```
 
