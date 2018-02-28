@@ -18,6 +18,7 @@ library(sf)
 library(tidyverse)
 library(mapview)
 library(proj4shortcut)
+library(plotly)
 
 prj_geo <- geo_wgs84
 prj_pro <- utm_wgs84('11s')
@@ -49,39 +50,40 @@ Overlap of in situ samples (red numbers) with the spatial extent of each image. 
 insit <- spTransform(insit, CRS(prj_pro)) 
 
 # raster tiffs
-imgs_pth <- list.files('img/GeoTiff_08_21/', full.names = T)
+imgs_pth <- list.files('img/GeoTiff_08_21/', pattern = '*\\.tif$', full.names = T)
 
 # get raster extents
 out <- list()
 cmbs <- for(i in 1:length(imgs_pth)){
   
-  # get extent
+  # raster aggregate, dissolve to polygon
   rst_chk <- stack(imgs_pth[[i]]) %>% 
-    extent 
-
-  # out <- c(out, list(tmp))
-  out[[i]] <- rst_chk
-
-  }
-
-# get max/min of all extents
-bnds <- c(out, list(extent(insit))) %>%
-  map(as.matrix) %>% 
-  do.call('rbind', .) %>% 
-  data.frame(val = row.names(.), .) %>% 
-  group_by(val) %>% 
-  summarise(
-    minv = min(min), 
-    maxv = max(max)
-    ) %>% 
-  gather('ind1', 'ind2', -val) %>% 
-  spread(val, ind2) %>% 
-  dplyr::select(-ind1)
+    .[[1]] %>% 
+    aggregate(fact = 10, fun = mean)
+  values(rst_chk) <- ifelse(is.na(values(rst_chk)), NA, 1)
+  ply <- rst_chk %>% 
+    rasterToPolygons(dissolve = T)
   
-plot(y ~ x, bnds, type = 'n')  
-invisible(lapply(out, plot, add = T))
-txt <- data.frame(insit)
-text(txt$lon, txt$lat, txt$site, cex = 0.5, col = 'red')
+  out[[i]] <- ply
+  
+}
+
+# fortify polygons for plot
+allply <- out %>% 
+  map(., function(x){
+    dat <- fortify(x) %>% 
+      mutate(fl = gsub('\\.[0-9]$', '', names(x@data)))
+    return(dat)
+    }) %>% 
+  enframe %>% 
+  unnest
+
+# plot
+p <- ggplot() + 
+  geom_polygon(data = allply, aes(x = long, y = lat, group = fl), alpha = 0.5) + 
+  geom_text(data = data.frame(insit), aes(x = lon, y = lat, label = site)) + 
+  coord_equal()
+ggplotly(p)
 ```
 
 Extracted pixel values for each of four bands in each image where sample sites occurred within an image.
@@ -131,13 +133,34 @@ exts
 
 Scatterplots of band values (din) with measured chlorophyll.
 ```{r fig.height = 4, fig.width  = 6}
-toplo <- exts
+toplo <- exts %>% 
+  group_by(site, chl, bnd) %>% 
+  summarise(din = mean(din))
 ggplot(toplo, aes(x = din, y = chl)) + 
   geom_point() + 
   facet_wrap(~bnd, ncol = 2) + 
   stat_smooth(method = 'lm') + 
   theme_bw()
 ```
+
+Working with model selection:
+```{r}
+library(caret)
+library(MuMIn)
+
+tomod <- exts %>% 
+  mutate(bnd = paste0('b', bnd)) %>% 
+  spread(bnd, din)
+
+glb <- lm(chl ~ (b1 + b2 + b2 + b3 + b4)^3 + I(b1^2) + I(b2^2) + I(b3^2) + I(b4^2), tomod, 
+          na.action = 'na.pass')
+
+tmp <- dredge(glb, evaluate = F)
+
+# createFolds(1:nrow(tomod), k = 5)
+
+```
+
 
 ## September 6th
 
@@ -164,39 +187,40 @@ Overlap of in situ samples (red numbers) with the spatial extent of each image. 
 insit <- spTransform(insit, CRS(prj_pro)) 
 
 # raster tiffs
-imgs_pth <- list.files('img/GeoTiff_09_06/', full.names = T)
+imgs_pth <- list.files('img/GeoTiff_09_06/', pattern = '*\\.tif$', full.names = T)
 
 # get raster extents
 out <- list()
 cmbs <- for(i in 1:length(imgs_pth)){
   
-  # get extent
+  # raster aggregate, dissolve to polygon
   rst_chk <- stack(imgs_pth[[i]]) %>% 
-    extent 
-
-  # out <- c(out, list(tmp))
-  out[[i]] <- rst_chk
-
-  }
-
-# get max/min of all extents
-bnds <- c(out, list(extent(insit))) %>%
-  map(as.matrix) %>% 
-  do.call('rbind', .) %>% 
-  data.frame(val = row.names(.), .) %>% 
-  group_by(val) %>% 
-  summarise(
-    minv = min(min), 
-    maxv = max(max)
-    ) %>% 
-  gather('ind1', 'ind2', -val) %>% 
-  spread(val, ind2) %>% 
-  dplyr::select(-ind1)
+    .[[1]] %>% 
+    aggregate(fact = 10, fun = mean)
+  values(rst_chk) <- ifelse(is.na(values(rst_chk)), NA, 1)
+  ply <- rst_chk %>% 
+    rasterToPolygons(dissolve = T)
   
-plot(y ~ x, bnds, type = 'n')  
-invisible(lapply(out, plot, add = T))
-txt <- data.frame(insit)
-text(txt$lon, txt$lat, txt$site, cex = 0.5, col = 'red')
+  out[[i]] <- ply
+  
+}
+
+# fortify polygons for plot
+allply <- out %>% 
+  map(., function(x){
+    dat <- fortify(x) %>% 
+      mutate(fl = gsub('\\.[0-9]$', '', names(x@data)))
+    return(dat)
+    }) %>% 
+  enframe %>% 
+  unnest
+
+# plot
+p <- ggplot() + 
+  geom_polygon(data = allply, aes(x = long, y = lat, group = fl), alpha = 0.5) + 
+  geom_text(data = data.frame(insit), aes(x = lon, y = lat, label = site)) + 
+  coord_equal()
+ggplotly(p)
 ```
 
 Extracted pixel values for each of four bands in each image where sample sites occurred within an image.
@@ -229,7 +253,9 @@ exts
 
 Scatterplots of band values (din) with measured chlorophyll.
 ```{r fig.height = 4, fig.width  = 6}
-toplo <- exts
+toplo <- exts %>% 
+  group_by(site, chl, bnd) %>% 
+  summarise(din = mean(din))
 ggplot(toplo, aes(x = din, y = chl)) + 
   geom_point() + 
   facet_wrap(~bnd, ncol = 2) + 

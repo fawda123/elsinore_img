@@ -16,3 +16,7 @@ leaflet
 mapview
 bindrcpp
 proj4shortcut
+plotly
+lattice
+caret
+MuMIn
