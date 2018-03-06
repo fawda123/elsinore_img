@@ -119,27 +119,36 @@ for(i in 1:length(imgs_pth)){
 
 }
 
+# combine all extracted samples
+# get ndvi, gndvi, vigreen
+# current not in nm
 exts <- out %>% 
   do.call('rbind', .) %>% 
   remove_rownames() %>% 
-  separate(img_bnd, c('img', 'bnd'), sep = '\\.') 
+  separate(img_bnd, c('img', 'bnd'), sep = '\\.') %>% 
+  select(-img) %>% 
+  mutate(bnd = factor(bnd, levels = c('1', '2', '3', '4'), labels = c('grn', 'red', 'edg', 'nir'))) %>% 
+  spread(bnd, din) %>% 
+  mutate(
+    ndvi = (nir - red) / (nir + red), # normalized diff veg index
+    gndvi = (nir - grn) / (nir + grn), # green normalized diff veg index
+    vigrn = (grn - red) / (grn + red) # normalized diff of green and red bands
+  ) %>% 
+  gather('var', 'val', -site, -chl)
 exts
 ```
 
 Scatterplots of band values (din) with measured chlorophyll.
-```{r fig.height = 4, fig.width  = 6}
-toplo <- exts %>% 
-  group_by(site, chl, bnd) %>% 
-  summarise(din = mean(din))
-ggplot(toplo, aes(x = din, y = chl)) + 
+```{r fig.height = 8, fig.width  = 6}
+ggplot(exts, aes(x = val, y = chl)) + 
   geom_point() + 
-  facet_wrap(~bnd, ncol = 2) + 
+  facet_wrap(~var, ncol = 2, scales = 'free_x') + 
   stat_smooth(method = 'lm') + 
   theme_bw()
 ```
 
 Working with model selection:
-```{r}
+```{r, eval = F}
 library(caret)
 library(MuMIn)
 # https://pix4d.com/sequoia-faq/#3
@@ -243,18 +252,26 @@ for(i in 1:length(imgs_pth)){
 exts <- out %>% 
   do.call('rbind', .) %>% 
   remove_rownames() %>% 
-  separate(img_bnd, c('img', 'bnd'), sep = '\\.')
+  separate(img_bnd, c('img', 'bnd'), sep = '\\.') %>% 
+  group_by(site, chl, bnd) %>% 
+  summarise(din = mean(din)) %>% 
+  ungroup %>% 
+  mutate(bnd = factor(bnd, levels = c('1', '2', '3', '4'), labels = c('grn', 'red', 'edg', 'nir'))) %>% 
+  spread(bnd, din) %>% 
+  mutate(
+    ndvi = (nir - red) / (nir + red), # normalized diff veg index
+    gndvi = (nir - grn) / (nir + grn), # green normalized diff veg index
+    vigrn = (grn - red) / (grn + red) # normalized diff of green and red bands
+  ) %>% 
+  gather('var', 'val', -site, -chl)
 exts
 ```
 
 Scatterplots of band values (din) with measured chlorophyll.
-```{r fig.height = 4, fig.width  = 6}
-toplo <- exts %>% 
-  group_by(site, chl, bnd) %>% 
-  summarise(din = mean(din))
-ggplot(toplo, aes(x = din, y = chl)) + 
+```{r fig.height = 8, fig.width  = 6}
+ggplot(exts, aes(x = val, y = chl)) + 
   geom_point() + 
-  facet_wrap(~bnd, ncol = 2) + 
+  facet_wrap(~var, ncol = 2, scales = 'free_x') + 
   stat_smooth(method = 'lm') + 
   theme_bw()
 ```
