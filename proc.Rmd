@@ -19,6 +19,11 @@ library(tidyverse)
 library(mapview)
 library(proj4shortcut)
 library(plotly)
+library(caret)
+library(MuMIn)
+
+# band/camera info
+# https://pix4d.com/sequoia-faq/#3
 
 prj_geo <- geo_wgs84
 prj_pro <- utm_wgs84('11s')
@@ -149,15 +154,11 @@ ggplot(exts, aes(x = val, y = chl)) +
 
 Working with model selection:
 ```{r, eval = F}
-library(caret)
-library(MuMIn)
-# https://pix4d.com/sequoia-faq/#3
 
 tomod <- exts %>% 
-  mutate(bnd = paste0('b', bnd)) %>% 
-  spread(bnd, din)
+  spread(var, val)
 
-glb <- lm(chl ~ (b1 + b2 + b2 + b3 + b4)^3 + I(b1^2) + I(b2^2) + I(b3^2) + I(b4^2), tomod, 
+glb <- lm(chl ~ (grn + red + edg + nir)^2 + I(grn^2) + I(red^2) + I(edg^2) + I(nir^2), tomod, 
           na.action = 'na.pass')
 
 tmp <- dredge(glb, evaluate = F)
